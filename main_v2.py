@@ -6,6 +6,8 @@ import dotenv
 import os
 import openai
 from nbconvert import HTMLExporter
+import chromadb
+import pandas as pd
 
 from prompts import PLANNER_AGENT_MINDSET
 
@@ -16,11 +18,40 @@ SUGGESTOR_SYSTEM_PROMPT = """ You are an expert bioinformatitian specialised in 
 You take an input of a jupyter notebook and a tool description and you suggest 
 the next step in the analysis and write code for it. If the description of tool is absent, make suggestion without it."""
 
+df = pd.read_csv('tableExport-2.csv')
+# embed vectors
+chroma_client = chromadb.EphemeralClient() # Equivalent to chromadb.Client(), ephemeral.
+# Uncomment for persistent client
+# chroma_client = chromadb.PersistentClient()
+EMBEDDING_MODEL = "text-embedding-ada-002"
+# change this to biotech specialised model later
+from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+embedding_function = OpenAIEmbeddingFunction(api_key=openai.api_key, model_name=EMBEDDING_MODEL)
+scrnatools_description_collection = chroma_client.create_collection(name='scRNA_Tools_2', embedding_function=embedding_function)
+scrnatools_description_collection.add(
+    documents = list(df['extented_desc_readme_trim']),
+    metadatas = df.drop(['extented_desc_readme_trim'], axis = 1).to_dict(orient='records'),
+    ids = list(df.Name))
+
+# Query DB
+def query_collection(collection, query, max_results, dataframe):
+    results = collection.query(query_texts=query, n_results=max_results, include=['distances'])
+    df = pd.DataFrame({
+                'id':results['ids'][0],
+                'score':results['distances'][0],
+                'content': dataframe[dataframe.Name.isin(results['ids'][0])]['extented_desc_readme_trim'],
+                'platform': dataframe[dataframe.Name.isin(results['ids'][0])]['Platform'],
+                })
+
+    return df['content'].tolist() , df['id'].tolist()
+
+#print(query_collection(scrnatools_description_collection, 'quality controll python', 5, df))
+
 # Placeholder function for querying the vector database
-def query_vector_db(notebook_content):
+#def query_collection(collection, query, max_results = 3, dataframe):
     # Implement querying logic here
     # Return top 3 tools
-    return  ['Tool1', 'Tool2', 'Tool3']
+#    return  ['Tool1', 'Tool2', 'Tool3']
 
 # OpenAI querying logic here
 def get_code_suggestions(notebook_content, tool='', selected_model='gpt-3.5-turbo'):
@@ -94,14 +125,14 @@ if uploaded_file is not None:
 
 # Generate next step and display suggestions
 if uploaded_file and st.button('Generate next step in the analysis'):
-    top_tools = query_vector_db(notebook_content_nocode)
+    top_tools_desc, top_tools_names = query_collection(scrnatools_description_collection, notebook_content_nocode, 3, df)
     
     # Create three columns for suggestions
     col1, col2, col3 = st.columns(3)
     tools_columns = [col1, col2, col3]
 
-    for index, tool in enumerate(top_tools):
+    for index, tool_desc, tool_name in zip([0, 1, 2], top_tools_desc, top_tools_names):
         with tools_columns[index]:
-            st.subheader(f'Suggestion: {tool}')
-            suggestions = get_code_suggestions(notebook_content_nocode, tool, selected_model)
+            st.subheader(f'Suggestion: {tool_name}')
+            suggestions = get_code_suggestions(notebook_content_nocode, tool_desc, selected_model)
             st.write(suggestions)
