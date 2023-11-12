@@ -1,0 +1,6 @@
+nbformat
+streamlit
+openai
+chromadb
+dotenv
+nbconvert
