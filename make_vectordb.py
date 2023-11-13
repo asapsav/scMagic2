@@ -3,13 +3,25 @@ import openai
 import chromadb
 import numpy as np
 import requests
+from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+import tiktoken
+import os
+import dotenv
+dotenv.load_dotenv()
 
-df = pd.read_csv('tableExport-2.csv')
 
-import requests
-import pandas as pd
 
-# Assuming df is your existing DataFrame
+#import table with tools from scrna-tools.org
+df = pd.read_csv('tableExport.csv')
+
+
+
+def num_tokens_from_string(string: str, model_name: str = "gpt-3.5-turbo") -> int:
+    """Returns the number of tokens in a text string."""
+    encoding = tiktoken.encoding_for_model(model_name)
+    num_tokens = len(encoding.encode(string))
+    return num_tokens
+
 
 # Define a function to fetch README content
 def get_readme(url):
@@ -27,10 +39,34 @@ def get_readme(url):
         # Handle exceptions
         return ""
 
-# Counter for printing status
-counter = 0
+def save_dataframe(df, directory, base_filename):
+    """
+    Save a DataFrame to a CSV file with versioning if the file already exists.
 
-# Apply the function to each row in the DataFrame
+    :param df: DataFrame to be saved.
+    :param directory: Directory where the file will be saved.
+    :param base_filename: The base name of the file, without version number.
+    """
+    # Construct the initial file path
+    file_path = os.path.join(directory, base_filename)
+
+    # Initialize version number
+    version = 0
+
+    # Check if the file exists and update the file name with the next version
+    while os.path.exists(file_path):
+        version += 1
+        # Construct new file path with version number
+        file_name, file_extension = os.path.splitext(base_filename)
+        file_path = os.path.join(directory, f"{file_name}_v{version}{file_extension}")
+
+    # Save the DataFrame
+    df.to_csv(file_path, index=False)
+    print(f"DataFrame saved as {file_path}")
+
+# Prepare the DataFrame
+
+counter = 0 # for status printing
 for index, row in df.iterrows():
     df.at[index, 'Readme'] = get_readme(row['Code'])
 
@@ -38,27 +74,6 @@ for index, row in df.iterrows():
     counter += 1
     if counter % 100 == 0:
         print(f"Processed {counter} rows.")
-
-chroma_client = chromadb.EphemeralClient() # Equivalent to chromadb.Client(), ephemeral.
-# Uncomment for persistent client
-# chroma_client = chromadb.PersistentClient()
-
-EMBEDDING_MODEL = "text-embedding-ada-002"
-# change this to biotech specialised model later
-
-from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
-
-
-embedding_function = OpenAIEmbeddingFunction(api_key='', model_name=EMBEDDING_MODEL)
-
-scrnatools_description_collection = chroma_client.create_collection(name='scRNA_Tools', embedding_function=embedding_function)
-
-import tiktoken
-def num_tokens_from_string(string: str, model_name: str = "gpt-3.5-turbo") -> int:
-    """Returns the number of tokens in a text string."""
-    encoding = tiktoken.encoding_for_model(model_name)
-    num_tokens = len(encoding.encode(string))
-    return num_tokens
 
 def make_desc(row):
     # Example function using row 'A' and 'B'
@@ -68,19 +83,22 @@ def make_desc(row):
 
 df['extented_desc'] = df.apply(make_desc, axis=1)
 
-def make_desc(row):
+def make_desc_readme(row):
     # Example function using row 'A' and 'B'
     return 'Platform: ' + row['Platform'] + \
             '\n Description: ' + row['Description'] + \
             '\n Categories: ' + row['Categories'] + \
             '\n Readme: ' + row['Readme']
 
-df['extented_desc_readme'] = df.apply(make_desc, axis=1)
+df['extented_desc_readme'] = df.apply(make_desc_readme, axis=1)
 
 assert df.isna().sum()['extented_desc'] == 0 # check for nans in desc to make embedding collection
 
 df['tokens_in_ext_desc'] = df['extented_desc'].apply(num_tokens_from_string)
-df.to_csv('tableExport-2.csv', index = False)
+
+save_dataframe(df, 'dataframes', 'tool-table-with-readmes.csv')
+
+#df.to_csv('tableExport-2.csv', index = False)
 
 #df['tokens_in_ext_desc'].hist()
 
@@ -106,10 +124,19 @@ df['Readme'].head(20)
 
 df['Readme'] = df['Readme'].apply(lambda x: x.replace('\n', ' ').replace('\r', ' ').replace("'", "\\'") if pd.notna(x) else x)
 
-df.to_csv('tableExport-2.csv', index = False)
-print('Saved the DF')
+save_dataframe(df, 'dataframes', 'tool-table-with-readmestrimmed.csv')
 
-"""Embedd Vectors"""
+
+# Embedd Vectors
+
+chroma_client = chromadb.EphemeralClient() # Equivalent to chromadb.Client(), ephemeral.
+# Uncomment for persistent client
+# chroma_client = chromadb.PersistentClient()
+
+EMBEDDING_MODEL = "text-embedding-ada-002"
+# change this to biotech specialised model later
+embedding_function = OpenAIEmbeddingFunction(api_key=os.getenv("OPENAI_API_KEY"), model_name=EMBEDDING_MODEL)
+scrnatools_description_collection = chroma_client.create_collection(name='scRNA_Tools', embedding_function=embedding_function)
 
 # Add the content vectors
 scrnatools_description_collection.add(
@@ -123,7 +150,7 @@ scrnatools_description_collection.add(
     metadatas = df.drop(['extented_desc_readme_trim'], axis = 1).to_dict(orient='records'),
     ids = list(df.Name))
 
-"""Query DB"""
+# Query DB
 
 def query_collection(collection, query, max_results, dataframe):
     results = collection.query(query_texts=query, n_results=max_results, include=['distances'])

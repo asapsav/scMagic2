@@ -1,6 +1,9 @@
-nbformat
-streamlit
-openai
 chromadb
-dotenv
 nbconvert
+streamlit
+nbformat
+tiktoken
+python-dotenv
+openai
+nbconvert
+pandas
