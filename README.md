@@ -15,9 +15,11 @@ Vector DB of software tools for scRNA-seq analysis
 - [x] Create vector database of scRNA-seq tools
 - [x] Create a simple query engine for vector database
 - [x] Create a simple web app to use vector database as coding recomendation engine
-- [ ] Make web app use vector DB directly
+- [x] Make web app use vector DB directly
 - [ ] Make live connection with [source data](https://github.com/scRNA-tools/scRNA-tools/tree/master/database)
-- [ ] Optimise vector DB for scEvals by utisiling citation count, usage context from citations, full documentstion, other metadata, etc.
+- [ ] Optimise vector DB for scEvals by utisiling citation count, usage context from citations, full documentstion, other
+ metadata, etc.
+- [ ] Experiment with custom distance metrics, embedding methods and other search/ranking algorithms. 
 
 ## Acknowledgements
 * data from [scrna-tool.org](https://www.scrna-tools.org)

@@ -126,9 +126,8 @@ def prepare_dataframe(df):
 # Create Vector DB
 def get_vector_db(df):
 
-    chroma_client = chromadb.EphemeralClient() # Equivalent to chromadb.Client(), ephemeral.
     # Uncomment for persistent client
-    # chroma_client = chromadb.PersistentClient()
+    chroma_client = chromadb.PersistentClient()
 
     EMBEDDING_MODEL = "text-embedding-ada-002"
     # change this to biotech specialised model later
