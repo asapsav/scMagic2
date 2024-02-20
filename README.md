@@ -1,5 +1,5 @@
 # scMagic2
-Vector DB of software tools for scRNA-seq analysis
+Vector DB of software tools for scRNA-seq analysis. [Demo](https://www.loom.com/share/5304c0f09935476aa66b5c05da935a2a?sid=4d0af412-92d3-4e6c-acba-b34071acdf57)
 
 ## How to use
 1. Use `make_vectordb.py` to create and query a vector database of scRNA-esq tools
